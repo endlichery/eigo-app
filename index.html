@@ -1,74 +1,258 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>瞬間英作文トレーニング - フル機能版</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
-</head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>瞬間英作文トレーニング 進捗管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <style>
+        body { font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; }
+        .status-not-started { border-left: 5px solid #d1d5db; }
+        .status-in-progress { border-left: 5px solid #f59e0b; }
+        .status-completed { border-left: 5px solid #10b981; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .toast-in { animation: toastIn 0.5s ease-in-out; }
+        @keyframes toastIn { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .filter-btn-active {
+            background-color: #374151 !important;
+            color: #ffffff !important;
+        }
+        .achievement-locked {
+            filter: grayscale(100%);
+            opacity: 0.6;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .details-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+    </style>
+    </head>
 <body class="bg-stone-100 text-stone-800">
-  <main class="container mx-auto max-w-4xl p-4">
-    <h1 class="text-3xl font-bold text-center mb-4">瞬間英作文トレーニング</h1>
-    <p class="text-center text-gray-600 mb-6">章ごとの進捗・実績が確認できます</p>
 
-    <section class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8" id="progress-sections">
-      <div class="bg-white p-4 rounded-lg shadow">
-        <h2 class="font-bold text-lg mb-2">Part 1</h2>
-        <p>完了: <span id="p1-done">0</span> / 10</p>
-        <progress id="p1-bar" max="10" value="0" class="w-full h-2"></progress>
-      </div>
-      <div class="bg-white p-4 rounded-lg shadow">
-        <h2 class="font-bold text-lg mb-2">Part 2</h2>
-        <p>完了: <span id="p2-done">0</span> / 10</p>
-        <progress id="p2-bar" max="10" value="0" class="w-full h-2"></progress>
-      </div>
-    </section>
+    <div class="container mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
 
-    <section class="text-center mb-8">
-      <button onclick="completeChapter('part1')" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded m-1">Part 1 完了追加</button>
-      <button onclick="completeChapter('part2')" class="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded m-1">Part 2 完了追加</button>
-    </section>
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl sm:text-4xl font-bold text-stone-700">どんどん話すための瞬間英作文トレーニング</h1>
+            <p class="text-lg text-stone-500 mt-2">インタラクティブ進捗管理</p>
+        </header>
 
-    <section class="text-center">
-      <h2 class="text-xl font-semibold mb-2">実績バッジ</h2>
-      <div id="achievements" class="flex flex-wrap justify-center gap-2">
-        <span class="badge px-3 py-1 rounded-full bg-gray-300 text-white">まだ未獲得</span>
-      </div>
-    </section>
-  </main>
+        <section id="dashboard" class="mb-8 p-6 bg-white rounded-xl shadow-lg">
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
+                <h2 class="text-2xl font-bold text-stone-700">学習進捗ダッシュボード <span id="dashboard-title" class="text-lg text-stone-500 font-normal"></span></h2>
+                <div class="flex gap-2">
+                    <button id="achievements-btn" class="btn bg-amber-500 hover:bg-amber-600 text-white py-1 px-3 rounded-lg text-sm whitespace-nowrap">🏆 実績</button>
+                    <button id="reset-data-btn" class="btn bg-red-500 hover:bg-red-600 text-white py-1 px-3 rounded-lg text-sm whitespace-nowrap">リセット</button>
+                </div>
+            </div>
+             <p class="text-stone-600 mb-6">下のフィルターで表示するPartを選択すると、このダッシュボードの内容も連動して更新されます。</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+                <div class="chart-container relative h-64 w-full max-w-sm mx-auto md:col-span-1">
+                    <canvas id="progressChart"></canvas>
+                </div>
+                <div id="stats" class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-center md:col-span-2">
+                    <div class="bg-stone-50 p-4 rounded-lg">
+                        <p class="text-4xl font-bold text-green-500" id="completedCount">0</p>
+                        <p class="text-sm text-stone-500">完了</p>
+                    </div>
+                    <div class="bg-stone-50 p-4 rounded-lg">
+                        <p class="text-4xl font-bold text-amber-500" id="inProgressCount">0</p>
+                        <p class="text-sm text-stone-500">実施中</p>
+                    </div>
+                    <div class="bg-stone-50 p-4 rounded-lg">
+                        <p class="text-4xl font-bold text-gray-500" id="notStartedCount">0</p>
+                        <p class="text-sm text-stone-500">未着手</p>
+                    </div>
+                     <div class="bg-stone-50 p-4 rounded-lg">
+                        <p class="text-4xl font-bold text-stone-700" id="totalCount">0</p>
+                        <p class="text-sm text-stone-500">合計</p>
+                    </div>
+                    <div class="bg-sky-50 p-4 rounded-lg">
+                        <p class="text-4xl font-bold text-sky-500" id="currentStreak">0</p>
+                        <p class="text-sm text-stone-500">継続日数 (全体)</p>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-lg">
+                        <p class="text-4xl font-bold text-orange-500" id="totalRepsCount">0</p>
+                        <p class="text-sm text-stone-500">総周回数</p>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-  <script>
-    const state = {
-      part1: 0,
-      part2: 0,
-    };
+        <section>
+            <div class="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 mb-6">
+                <button data-filter="all" class="filter-btn btn bg-gray-800 text-white py-2 px-5 rounded-full shadow-md">すべて</button>
+                <div class="flex gap-2 border border-gray-300 rounded-full p-1">
+                    <button data-filter="1-1" class="filter-btn btn bg-white text-stone-700 py-1 px-4 rounded-full">1-1</button>
+                    <button data-filter="1-2" class="filter-btn btn bg-white text-stone-700 py-1 px-4 rounded-full">1-2</button>
+                </div>
+                <div class="flex gap-2 border border-gray-300 rounded-full p-1">
+                    <button data-filter="2-1" class="filter-btn btn bg-white text-stone-700 py-1 px-4 rounded-full">2-1</button>
+                    <button data-filter="2-2" class="filter-btn btn bg-white text-stone-700 py-1 px-4 rounded-full">2-2</button>
+                    <button data-filter="2-3" class="filter-btn btn bg-white text-stone-700 py-1 px-4 rounded-full">2-3</button>
+                </div>
+                 <div class="flex gap-2 border border-gray-300 rounded-full p-1">
+                    <button data-filter="3-1" class="filter-btn btn bg-white text-stone-700 py-1 px-4 rounded-full">3-1</button>
+                    <button data-filter="3-2" class="filter-btn btn bg-white text-stone-700 py-1 px-4 rounded-full">3-2</button>
+                </div>
+            </div>
 
-    function completeChapter(part) {
-      if (state[part] < 10) {
-        state[part]++;
-        document.getElementById(part === 'part1' ? 'p1-done' : 'p2-done').textContent = state[part];
-        document.getElementById(part === 'part1' ? 'p1-bar' : 'p2-bar').value = state[part];
-        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
-        checkAchievements();
-      }
-    }
+            <div id="chapters-grid" class="space-y-3">
+            </div>
+        </section>
+    </div>
 
-    function checkAchievements() {
-      const badgeContainer = document.getElementById("achievements");
-      badgeContainer.innerHTML = "";
-      if (state.part1 >= 10) {
-        badgeContainer.innerHTML += '<span class="px-3 py-1 rounded-full bg-blue-500 text-white">🏅 Part 1 完全制覇</span>';
-      }
-      if (state.part2 >= 10) {
-        badgeContainer.innerHTML += '<span class="px-3 py-1 rounded-full bg-green-500 text-white">🏅 Part 2 完全制覇</span>';
-      }
-      if (state.part1 + state.part2 >= 20) {
-        badgeContainer.innerHTML += '<span class="px-3 py-1 rounded-full bg-yellow-500 text-white">👑 全体制覇</span>';
-      }
-    }
-  </script>
-</body>
-</html>
+    <div id="reset-modal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4 fade-in">
+            <h3 class="text-lg font-bold mb-4">確認</h3>
+            <p class="text-stone-600 mb-6">本当にすべての学習データをリセットしますか？この操作は元に戻せません。</p>
+            <div class="flex justify-end gap-4">
+                <button id="cancel-reset-btn" class="btn bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded-lg">キャンセル</button>
+                <button id="confirm-reset-btn" class="btn bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-lg">リセットする</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="achievements-modal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl mx-4 fade-in max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">実績一覧</h3>
+                <button id="close-achievements-btn" class="text-2xl font-bold">&times;</button>
+            </div>
+            <div id="achievements-list" class="overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
+        </div>
+    </div>
+    
+    <div id="ai-modal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg mx-4 fade-in max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">✨ AI例文チャレンジ</h3>
+                <button id="close-ai-modal-btn" class="text-2xl font-bold">&times;</button>
+            </div>
+            <div id="ai-modal-body" class="overflow-y-auto">
+                <div id="ai-modal-loader" class="flex justify-center items-center h-48">
+                    <div class="loader"></div>
+                </div>
+                <div id="ai-modal-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="timer-modal" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-sm mx-4 fade-in text-center">
+            <h3 class="text-xl font-bold mb-2">タイム測定</h3>
+            <p id="timer-chapter-title" class="text-stone-600 mb-4"></p>
+            <div id="timer-display" class="text-6xl font-mono font-bold my-6">00:00.0</div>
+            <div class="flex justify-center gap-4">
+                <button id="timer-start-stop-btn" class="btn bg-green-500 hover:bg-green-600 text-white py-3 px-8 rounded-lg text-lg">スタート</button>
+                <button id="timer-record-btn" class="btn bg-sky-500 hover:bg-sky-600 text-white py-3 px-6 rounded-lg hidden">記録する</button>
+                <button id="timer-cancel-btn" class="btn bg-gray-300 hover:bg-gray-400 text-gray-800 py-3 px-6 rounded-lg">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-5 right-5 bg-green-500 text-white py-3 px-5 rounded-lg shadow-xl hidden toast-in"></div>
+
+    <script>
+        const CHAPTER_STORAGE_KEY = 'shunkanEigoProgress_v3';
+        const STATS_STORAGE_KEY = 'shunkanEigoStats_v3';
+
+        const bookData = [
+            { id: 'part-1-1-this-that', part: 1, subPart: '1-1', title: 'this / that' }, { id: 'part-1-1-these-those', part: 1, subPart: '1-1', title: 'these / those' }, { id: 'part-1-1-what-is-are', part: 1, subPart: '1-1', title: 'What is (are) ~ ?' }, { id: 'part-1-1-pronoun-subject', part: 1, subPart: '1-1', title: '人称代名詞の主格' }, { id: 'part-1-1-pronoun-possessive', part: 1, subPart: '1-1', title: '人称代名詞の所有格' }, { id: 'part-1-1-who-is-are', part: 1, subPart: '1-1', title: 'Who is (are) ~ ?' }, { id: 'part-1-1-general-verb', part: 1, subPart: '1-1', title: '一般動詞' }, { id: 'part-1-1-how-many-much', part: 1, subPart: '1-1', title: 'how many (much) ~' }, { id: 'part-1-1-pronoun-object', part: 1, subPart: '1-1', title: '人称代名詞の目的格' }, { id: 'part-1-1-pronoun-possessive-independent', part: 1, subPart: '1-1', title: '人称代名詞の独立所有格' }, { id: 'part-1-1-imperative-lets', part: 1, subPart: '1-1', title: '命令文 / Let\'s ~' }, 
+            { id: 'part-1-2-whose', part: 1, subPart: '1-2', title: 'whose ~' }, { id: 'part-1-2-where', part: 1, subPart: '1-2', title: 'where ~' }, { id: 'part-1-2-when', part: 1, subPart: '1-2', title: 'when ~' }, { id: 'part-1-2-which', part: 1, subPart: '1-2', title: 'which ~' }, { id: 'part-1-2-it', part: 1, subPart: '1-2', title: 'it ~' }, { id: 'part-1-2-what-time', part: 1, subPart: '1-2', title: 'What time ~ ?' }, { id: 'part-1-2-how', part: 1, subPart: '1-2', title: 'how ~' }, { id: 'part-1-2-how-old-tall', part: 1, subPart: '1-2', title: 'How old (tall) ~ ?' }, { id: 'part-1-2-who-subject', part: 1, subPart: '1-2', title: '疑問詞主語の who' }, { id: 'part-1-2-can', part: 1, subPart: '1-2', title: 'can' }, { id: 'part-1-2-present-progressive', part: 1, subPart: '1-2', title: '現在進行形' }, { id: 'part-1-2-there-is-are', part: 1, subPart: '1-2', title: 'There is (are) ~' },
+            { id: 'part-2-1-past-tense', part: 2, subPart: '2-1', title: '過去形' }, { id: 'part-2-1-past-progressive', part: 2, subPart: '2-1', title: '過去進行形' }, { id: 'part-2-1-when-clause', part: 2, subPart: '2-1', title: 'when節' }, { id: 'part-2-1-general-verb-svc', part: 2, subPart: '2-1', title: '一般動詞のSVC' }, { id: 'part-2-1-svo-to-for', part: 2, subPart: '2-1', title: 'SVO + to (for)' }, { id: 'part-2-1-svoo', part: 2, subPart: '2-1', title: 'SVOO' }, { id: 'part-2-1-will-simple-future', part: 2, subPart: '2-1', title: 'will (単純未来)' }, { id: 'part-2-1-will-intention', part: 2, subPart: '2-1', title: 'will (意志未来)' }, { id: 'part-2-1-will-shall-request', part: 2, subPart: '2-1', title: 'will (依頼) / shall (申し出・誘い)' }, { id: 'part-2-1-be-going-to', part: 2, subPart: '2-1', title: 'be going to' }, { id: 'part-2-1-must-may', part: 2, subPart: '2-1', title: 'must / may' }, { id: 'part-2-1-have-to', part: 2, subPart: '2-1', title: 'have to' }, { id: 'part-2-1-be-able-to', part: 2, subPart: '2-1', title: 'be able to' },
+            { id: 'part-2-2-exclamatory', part: 2, subPart: '2-2', title: '感嘆文' }, { id: 'part-2-2-infinitive-noun', part: 2, subPart: '2-2', title: '不定詞―名詞的用法' }, { id: 'part-2-2-infinitive-adverb-purpose', part: 2, subPart: '2-2', title: '不定詞―副詞的用法(目的)' }, { id: 'part-2-2-infinitive-adverb-reason', part: 2, subPart: '2-2', title: '不定詞―副詞的用法(感情の原因)' }, { id: 'part-2-2-infinitive-adjective', part: 2, subPart: '2-2', title: '不定詞―形容詞的用法' }, { id: 'part-2-2-gerund', part: 2, subPart: '2-2', title: '動名詞' }, { id: 'part-2-2-as-as-comparison', part: 2, subPart: '2-2', title: '原級比較' }, { id: 'part-2-2-comparative-er', part: 2, subPart: '2-2', title: '比較級―er形' }, { id: 'part-2-2-superlative-est', part: 2, subPart: '2-2', title: '最上級―est形' }, { id: 'part-2-2-comparative-more', part: 2, subPart: '2-2', title: '比較級―more' }, { id: 'part-2-2-superlative-most', part: 2, subPart: '2-2', title: '最上級―most' }, { id: 'part-2-2-comparative-adverb', part: 2, subPart: '2-2', title: '比較級―副詞' },
+            { id: 'part-2-3-superlative-adverb', part: 2, subPart: '2-3', title: '最上級―副詞' }, { id: 'part-2-3-interrogative-comparison', part: 2, subPart: '2-3', title: '比較級、最上級を使った疑問詞の文' }, { id: 'part-2-3-present-perfect-continuous', part: 2, subPart: '2-3', title: '現在完了―継続' }, { id: 'part-2-3-present-perfect-completion', part: 2, subPart: '2-3', title: '現在完了―完了' }, { id: 'part-2-3-present-perfect-experience', part: 2, subPart: '2-3', title: '現在完了―経験' }, { id: 'part-2-3-present-perfect-progressive', part: 2, subPart: '2-3', title: '現在完了―進行形' }, { id: 'part-2-3-that-clause', part: 2, subPart: '2-3', title: 'that節' }, { id: 'part-2-3-passive-1', part: 2, subPart: '2-3', title: '受身―1' }, { id: 'part-2-3-passive-2', part: 2, subPart: '2-3', title: '受身―2' },
+            { id: 'part-3-1-subordinate-conjunction-1', part: 3, subPart: '3-1', title: '従属節を導く接続詞―1' }, { id: 'part-3-1-subordinate-conjunction-2', part: 3, subPart: '3-1', title: '従属節を導く接続詞―2' }, { id: 'part-3-1-indirect-question', part: 3, subPart: '3-1', title: '間接疑問文' }, { id: 'part-3-1-interrogative-to-infinitive', part: 3, subPart: '3-1', title: '疑問詞 + to不定詞' }, { id: 'part-3-1-formal-subject-it', part: 3, subPart: '3-1', title: '形式主語のit' }, { id: 'part-3-1-svo-to-infinitive', part: 3, subPart: '3-1', title: 'SVO + to不定詞' }, { id: 'part-3-1-svoc', part: 3, subPart: '3-1', title: 'SVOC' }, { id: 'part-3-1-present-participle-modifier', part: 3, subPart: '3-1', title: '現在分詞修飾' }, { id: 'part-3-1-past-participle-modifier', part: 3, subPart: '3-1', title: '過去分詞修飾' }, { id: 'part-3-1-relative-pronoun-subject-person', part: 3, subPart: '3-1', title: '関係代名詞・主格(人)' }, { id: 'part-3-1-relative-pronoun-subject-non-person', part: 3, subPart: '3-1', title: '関係代名詞・主格(人以外)' },
+            { id: 'part-3-2-relative-pronoun-possessive', part: 3, subPart: '3-2', title: '関係代名詞・所有格 whose と of which' }, { id: 'part-3-2-relative-pronoun-object-person', part: 3, subPart: '3-2', title: '関係代名詞・目的格(人)' }, { id: 'part-3-2-relative-pronoun-object-non-person', part: 3, subPart: '3-2', title: '関係代名詞・目的格(人以外)' }, { id: 'part-3-2-relative-pronoun-what', part: 3, subPart: '3-2', title: '先行詞を含む関係代名詞 what' }, { id: 'part-3-2-too-to', part: 3, subPart: '3-2', title: 'too ~ to ...' }, { id: 'part-3-2-enough-to', part: 3, subPart: '3-2', title: 'enough ~ to ...' }, { id: 'part-3-2-so-that', part: 3, subPart: '3-2', title: 'so ~ that ...' }, { id: 'part-3-2-bare-infinitive-perception', part: 3, subPart: '3-2', title: '原型不定詞・知覚' }, { id: 'part-3-2-bare-infinitive-causative', part: 3, subPart: '3-2', title: '原型不定詞・使役' }, { id: 'part-3-2-relative-adverb-where', part: 3, subPart: '3-2', title: '関係副詞・where' }, { id: 'part-3-2-relative-adverb-when', part: 3, subPart: '3-2', title: '関係副詞・when' }
+        ];
+
+        let chapters = [];
+        let stats = {};
+        let progressChart = null;
+        let currentFilter = 'all';
+        let timerInterval = null;
+        let timerStartTime = 0;
+        let currentTimerChapterId = null;
+
+        const achievements = [
+            { id: 'first_step', title: 'はじめの一歩', description: '最初のChapterを完了する', emoji: '🌱', condition: (s, c) => c.filter(ch => ch.status === 'completed').length >= 1 },
+            { id: 'ten_completed', title: 'ウォームアップ', description: '10個のChapterを完了する', emoji: '🔥', condition: (s, c) => c.filter(ch => ch.status === 'completed').length >= 10 },
+            { id: 'part1_master', title: 'Part 1 制覇', description: 'Part 1のChapterを全て完了する', emoji: '🥇', condition: (s, c) => c.filter(ch => ch.part === 1).every(ch => ch.status === 'completed') },
+            { id: 'part2_master', title: 'Part 2 制覇', description: 'Part 2のChapterを全て完了する', emoji: '🥈', condition: (s, c) => c.filter(ch => ch.part === 2).every(ch => ch.status === 'completed') },
+            { id: 'part3_master', title: 'Part 3 制覇', description: 'Part 3のChapterを全て完了する', emoji: '🥉', condition: (s, c) => c.filter(ch => ch.part === 3).every(ch => ch.status === 'completed') },
+            { id: 'full_master', title: '完全制覇', description: '全てのChapterを完了する', emoji: '👑', condition: (s, c) => c.every(ch => ch.status === 'completed') },
+            { id: 'streak_3', title: '三日坊主卒業', description: '3日間連続で学習する', emoji: '🏃', condition: s => s.currentStreak >= 3 },
+            { id: 'streak_7', title: '継続は力なり', description: '7日間連続で学習する', emoji: '💪', condition: s => s.currentStreak >= 7 },
+            { id: 'streak_30', title: '習慣の達人', description: '30日間連続で学習する', emoji: '🧘', condition: s => s.currentStreak >= 30 },
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            renderDashboard(currentFilter);
+            renderCards(currentFilter);
+            setupEventListeners();
+        });
+        
+        function loadData() {
+            const savedChaptersJSON = localStorage.getItem(CHAPTER_STORAGE_KEY);
+            const savedStatsJSON = localStorage.getItem(STATS_STORAGE_KEY);
+            
+            const loadedChapters = savedChaptersJSON ? JSON.parse(savedChaptersJSON) : {};
+            
+            chapters = bookData.map(bookChapter => {
+                const savedChapter = loadedChapters[bookChapter.id];
+                return {
+                    ...bookChapter,
+                    status: savedChapter ? savedChapter.status : 'not-started',
+                    reps: savedChapter ? savedChapter.reps : [],
+                };
+            });
+
+            const defaultStats = {
+                lastActivityDate: null,
+                currentStreak: 0,
+                maxStreak: 0,
+                unlockedAchievements: []
+            };
+            stats = savedStatsJSON ? { ...defaultStats, ...JSON.parse(savedStatsJSON) } : defaultStats;
+        }
+        
+        function resetAllData() {
+            chapters.forEach(chapter => {
+                chapter.status = 'not-started';
+                chapter.reps = [];
+            });
+            stats = {
+                lastActivityDate: null,
+                currentStreak: 0,
+                maxStreak: 0,
+                unlockedAchievements: []
+            };
+            saveChapters();
+            saveStats();
+        }
+
+        function
