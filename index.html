@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>瞬間英作文トレーニング</title>
+  <title>瞬間英作文トレーニング - フル機能版</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
@@ -12,28 +12,62 @@
 <body class="bg-stone-100 text-stone-800">
   <main class="container mx-auto max-w-4xl p-4">
     <h1 class="text-3xl font-bold text-center mb-4">瞬間英作文トレーニング</h1>
-    <p class="text-center text-gray-600 mb-6">あなたの進捗がここに表示されます</p>
-    <div id="dashboard" class="p-4 bg-white rounded-lg shadow-md text-center">
-      <p class="text-lg font-semibold text-green-600 mb-2">完了: <span id="completedCount">0</span></p>
-      <p class="text-lg font-semibold text-amber-500 mb-2">実施中: <span id="inProgressCount">0</span></p>
-      <p class="text-lg font-semibold text-gray-400 mb-2">未着手: <span id="notStartedCount">0</span></p>
-      <p class="text-lg font-semibold text-blue-600 mb-2">継続日数: <span id="currentStreak">0</span></p>
-    </div>
-    <div class="mt-6 text-center">
-      <button onclick="simulateProgress()" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded">サンプル進捗追加</button>
-    </div>
+    <p class="text-center text-gray-600 mb-6">章ごとの進捗・実績が確認できます</p>
+
+    <section class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8" id="progress-sections">
+      <div class="bg-white p-4 rounded-lg shadow">
+        <h2 class="font-bold text-lg mb-2">Part 1</h2>
+        <p>完了: <span id="p1-done">0</span> / 10</p>
+        <progress id="p1-bar" max="10" value="0" class="w-full h-2"></progress>
+      </div>
+      <div class="bg-white p-4 rounded-lg shadow">
+        <h2 class="font-bold text-lg mb-2">Part 2</h2>
+        <p>完了: <span id="p2-done">0</span> / 10</p>
+        <progress id="p2-bar" max="10" value="0" class="w-full h-2"></progress>
+      </div>
+    </section>
+
+    <section class="text-center mb-8">
+      <button onclick="completeChapter('part1')" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded m-1">Part 1 完了追加</button>
+      <button onclick="completeChapter('part2')" class="bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded m-1">Part 2 完了追加</button>
+    </section>
+
+    <section class="text-center">
+      <h2 class="text-xl font-semibold mb-2">実績バッジ</h2>
+      <div id="achievements" class="flex flex-wrap justify-center gap-2">
+        <span class="badge px-3 py-1 rounded-full bg-gray-300 text-white">まだ未獲得</span>
+      </div>
+    </section>
   </main>
+
   <script>
-    function simulateProgress() {
-      const c = document.getElementById("completedCount");
-      const i = document.getElementById("inProgressCount");
-      const n = document.getElementById("notStartedCount");
-      const s = document.getElementById("currentStreak");
-      c.textContent = parseInt(c.textContent) + 1;
-      i.textContent = parseInt(i.textContent) + 1;
-      n.textContent = Math.max(0, parseInt(n.textContent) - 1);
-      s.textContent = parseInt(s.textContent) + 1;
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    const state = {
+      part1: 0,
+      part2: 0,
+    };
+
+    function completeChapter(part) {
+      if (state[part] < 10) {
+        state[part]++;
+        document.getElementById(part === 'part1' ? 'p1-done' : 'p2-done').textContent = state[part];
+        document.getElementById(part === 'part1' ? 'p1-bar' : 'p2-bar').value = state[part];
+        confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+        checkAchievements();
+      }
+    }
+
+    function checkAchievements() {
+      const badgeContainer = document.getElementById("achievements");
+      badgeContainer.innerHTML = "";
+      if (state.part1 >= 10) {
+        badgeContainer.innerHTML += '<span class="px-3 py-1 rounded-full bg-blue-500 text-white">🏅 Part 1 完全制覇</span>';
+      }
+      if (state.part2 >= 10) {
+        badgeContainer.innerHTML += '<span class="px-3 py-1 rounded-full bg-green-500 text-white">🏅 Part 2 完全制覇</span>';
+      }
+      if (state.part1 + state.part2 >= 20) {
+        badgeContainer.innerHTML += '<span class="px-3 py-1 rounded-full bg-yellow-500 text-white">👑 全体制覇</span>';
+      }
     }
   </script>
 </body>
